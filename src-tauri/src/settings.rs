@@ -25,6 +25,8 @@ pub struct Settings {
     pub extra_browser_args: String,
     /// Serve files from the `swap` folder in place of Krunker's assets.
     pub resource_swapper: bool,
+    /// Look for a new version shortly after launch and offer to install it.
+    pub check_for_updates: bool,
 }
 
 impl Default for Settings {
@@ -36,6 +38,7 @@ impl Default for Settings {
             height: 720.0,
             extra_browser_args: String::new(),
             resource_swapper: true,
+            check_for_updates: true,
         }
     }
 }
@@ -73,7 +76,7 @@ pub fn load(config_dir: &Path) -> Settings {
         // Windows editors and PowerShell often prepend a byte-order mark.
         Ok(text) => {
             serde_json::from_str(text.trim_start_matches('\u{feff}')).unwrap_or_else(|err| {
-                eprintln!("settings.json is invalid ({err}); using defaults");
+                log::warn!("settings.json is invalid ({err}); using defaults");
                 Settings::default()
             })
         }

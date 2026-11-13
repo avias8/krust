@@ -1,30 +1,53 @@
 # Krust
 
+[![CI](https://github.com/avias8/krust/actions/workflows/ci.yml/badge.svg)](https://github.com/avias8/krust/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/avias8/krust/actions/workflows/codeql.yml/badge.svg)](https://github.com/avias8/krust/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/avias8/krust/badge)](https://scorecard.dev/viewer/?uri=github.com/avias8/krust)
+
 A Krunker.io client written in Rust with [Tauri 2](https://tauri.app). It uses
 the system WebView2 runtime instead of bundling Chromium, so the browser engine
 stays current through Windows and Edge updates.
 
 Unofficial. Not affiliated with Krunker or FRVR.
 
-## Status
+## Install
 
-Pre-release. Tested on Windows 11 with WebView2 157 and a 240 Hz display:
+1. Download `Krust_x.y.z_x64-setup.exe` from the
+   [latest release](https://github.com/avias8/krust/releases/latest).
+2. Run it. It installs for your account only and needs no admin rights.
+3. Start Krust from the Start menu or desktop, and press <kbd>F1</kbd> for
+   settings.
 
-- The installer is about 1 MB and installs per user, without admin rights.
-  Uninstalling removes the app and its shortcuts and keeps your settings.
-- On a live game page: 240 FPS with `uncap_fps` off, and 900 to 1,200 FPS
-  with it on (short samples). Long-session stability is not yet tested.
+Krust checks for updates when it starts and asks before installing one.
+Every update is signature-checked; see [SECURITY.md](SECURITY.md) for how
+to verify a download yourself.
 
-The installer is not code-signed yet, so Windows SmartScreen may warn on
-first run.
+The installer is not code-signed with a Windows certificate yet, so
+SmartScreen may show "Windows protected your PC" the first time. Choose
+**More info → Run anyway**.
+
+## Features
 
 - Opens krunker.io in a native window
 - Optional uncapped frame rate (WebView2 browser arguments)
 - Userscript loader
 - Resource swapper, compatible with Crankshaft-style swap folders
 - Settings window (<kbd>F1</kbd>) and keyboard shortcuts
+- Signed automatic updates
+- Log file for bug reports (Settings → Advanced → Logs)
 
-Planned: auto-updater, ad and tracker blocking, Discord presence.
+Planned: ad and tracker blocking, Discord presence.
+
+## Status
+
+Pre-release. Tested on Windows 11 with WebView2 157 and a 240 Hz display:
+
+- The installer is under 2 MB and installs per user, without admin rights.
+  Uninstalling removes the app and its shortcuts and keeps your settings.
+- On a live game page: 240 FPS with `uncap_fps` off, and 900 to 1,200 FPS
+  with it on (short samples). Long-session stability is not yet tested.
+- Updates: an installed build found, verified and installed a newer
+  version, and refused a copy with one byte altered.
 
 ## Keyboard shortcuts
 
@@ -36,7 +59,7 @@ Planned: auto-updater, ad and tracker blocking, Discord presence.
 
 Shortcuts are handled natively, before the key reaches the game.
 
-## Requirements
+## Building from source
 
 - Windows 10 or 11 with the WebView2 runtime (preinstalled on Windows 11)
 - [Rust](https://rustup.rs) with the MSVC toolchain
@@ -74,6 +97,7 @@ settings window (<kbd>F1</kbd>) edits them and opens these folders for you.
   | `height`     | `720`   | Window height                        |
   | `extra_browser_args` | `""` | Extra Chromium switches for WebView2 |
   | `resource_swapper` | `true` | Serve files from the `swap` folder |
+  | `check_for_updates` | `true` | Look for updates at launch |
 
 - `scripts\*.js` are injected into Krunker pages before the game's own
   scripts, in file-name order. Changes apply on the next launch.
@@ -103,6 +127,10 @@ only install ones you trust.
 The swapper only serves files found when the `swap` folder was scanned, so
 a crafted URL such as `/../../Windows/win.ini` cannot reach anything else on
 disk.
+
+## Releasing
+
+See [RELEASING.md](RELEASING.md).
 
 ## Credits
 

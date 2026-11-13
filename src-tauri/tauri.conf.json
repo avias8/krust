@@ -18,7 +18,22 @@
     "copyright": "Copyright (c) 2026 Krust contributors. MIT License.",
     "shortDescription": "Krunker.io client",
     "longDescription": "An unofficial Krunker.io client built with Rust and Tauri, using the system WebView2 runtime.",
-    "targets": ["nsis"],
-    "icon": ["icons/icon.ico"]
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/avias8/krust/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

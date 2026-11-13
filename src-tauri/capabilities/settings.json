@@ -8,6 +8,8 @@
     "allow-get-settings",
     "allow-save-settings",
     "allow-open-folder",
-    "allow-restart"
+    "allow-restart",
+    "allow-check-update",
+    "allow-install-update"
   ]
 }

@@ -59,7 +59,7 @@ pub fn attach(webview: &PlatformWebview, app: AppHandle) {
             .controller()
             .add_AcceleratorKeyPressed(&handler, &mut token)
     } {
-        eprintln!("[krust] keyboard shortcuts unavailable: {err}");
+        log::error!("keyboard shortcuts unavailable: {err}");
     }
 }
 

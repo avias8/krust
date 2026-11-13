@@ -5,6 +5,7 @@ mod settings;
 #[cfg(windows)]
 mod shortcuts;
 mod swapper;
+mod updates;
 mod userscripts;
 
 use std::{fs, path::PathBuf};
@@ -12,6 +13,7 @@ use std::{fs, path::PathBuf};
 use serde::{Deserialize, Serialize};
 use settings::Settings;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
 
 const GAME_URL: &str = "https://krunker.io/";
 const MAIN_TITLE: &str = "Krust  \u{2014}  F1 settings";
@@ -19,6 +21,7 @@ const MAIN_TITLE: &str = "Krust  \u{2014}  F1 settings";
 /// Fixed for the life of the process.
 struct AppState {
     config_dir: PathBuf,
+    log_dir: PathBuf,
     /// Settings as they were at launch, to tell the user when a change
     /// needs a restart.
     launched: Settings,
@@ -69,7 +72,7 @@ fn open_settings(app: &AppHandle) {
             .additional_browser_args(&state.browser_args)
             .build();
     if let Err(err) = result {
-        eprintln!("[krust] could not open settings: {err}");
+        log::error!("could not open settings: {err}");
     }
 }
 
@@ -80,24 +83,42 @@ fn open_settings(app: &AppHandle) {
 struct SettingsView {
     settings: Settings,
     needs_restart: bool,
+    version: String,
+    updates_configured: bool,
 }
 
-fn view(state: &AppState, settings: Settings) -> SettingsView {
+fn view(app: &AppHandle, state: &AppState, settings: Settings) -> SettingsView {
     SettingsView {
         needs_restart: state.launched.needs_restart_for(&settings),
         settings,
+        version: app.package_info().version.to_string(),
+        updates_configured: updates::configured(app),
     }
 }
 
 #[tauri::command]
-fn get_settings(state: State<AppState>) -> SettingsView {
-    view(&state, settings::load(&state.config_dir))
+fn get_settings(app: AppHandle, state: State<AppState>) -> SettingsView {
+    view(&app, &state, settings::load(&state.config_dir))
 }
 
 #[tauri::command]
-fn save_settings(state: State<AppState>, settings: Settings) -> Result<SettingsView, String> {
+fn save_settings(
+    app: AppHandle,
+    state: State<AppState>,
+    settings: Settings,
+) -> Result<SettingsView, String> {
     settings::save(&state.config_dir, &settings).map_err(|err| err.to_string())?;
-    Ok(view(&state, settings))
+    Ok(view(&app, &state, settings))
+}
+
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<updates::UpdateInfo, String> {
+    updates::check(&app).await
+}
+
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    updates::install(&app).await
 }
 
 /// The page picks a folder by name, never by path, so it cannot open
@@ -108,6 +129,7 @@ enum Folder {
     Config,
     Swap,
     Scripts,
+    Logs,
 }
 
 #[tauri::command]
@@ -116,6 +138,7 @@ fn open_folder(state: State<AppState>, folder: Folder) -> Result<(), String> {
         Folder::Config => state.config_dir.clone(),
         Folder::Swap => state.config_dir.join("swap"),
         Folder::Scripts => state.config_dir.join("scripts"),
+        Folder::Logs => state.log_dir.clone(),
     };
     fs::create_dir_all(&path).map_err(|err| err.to_string())?;
     #[cfg(windows)]
@@ -131,13 +154,36 @@ fn restart(app: AppHandle) {
     app.restart();
 }
 
+fn log_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    let mut targets = vec![Target::new(TargetKind::LogDir {
+        file_name: Some("krust".into()),
+    })];
+    if cfg!(debug_assertions) {
+        targets.push(Target::new(TargetKind::Stderr));
+    }
+    tauri_plugin_log::Builder::new()
+        .clear_targets()
+        .targets(targets)
+        .level(log::LevelFilter::Info)
+        // Keep the log small: one 1 MB file plus one rotated copy.
+        .max_file_size(1_000_000)
+        .rotation_strategy(RotationStrategy::KeepOne)
+        .build()
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(log_plugin())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::Pending::default())
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
             open_folder,
-            restart
+            restart,
+            check_update,
+            install_update
         ])
         .on_window_event(|window, event| {
             // Closing the game closes Krust, even with settings still open.
@@ -146,7 +192,9 @@ fn main() {
             }
         })
         .setup(|app| {
+            log::info!("Krust {} starting", app.package_info().version);
             let config_dir = app.path().app_config_dir()?;
+            let log_dir = app.path().app_log_dir()?;
             let scripts_dir = config_dir.join("scripts");
             let swap_dir = config_dir.join("swap");
             fs::create_dir_all(&scripts_dir)?;
@@ -161,7 +209,7 @@ fn main() {
                 swapper::SwapIndex::default()
             };
             if !swaps.is_empty() {
-                eprintln!("[krust] swapping {} file(s)", swaps.len());
+                log::info!("swapping {} file(s)", swaps.len());
             }
 
             // With swaps, start blank and navigate once the swapper is ready.
@@ -181,11 +229,13 @@ fn main() {
                     .additional_browser_args(&browser_args);
 
             for (name, source) in userscripts::load(&scripts_dir) {
-                window = window.initialization_script(&userscripts::wrap(&name, &source));
+                window = window.initialization_script(userscripts::wrap(&name, &source));
             }
 
+            let check_for_updates = settings.check_for_updates;
             app.manage(AppState {
                 config_dir,
+                log_dir,
                 launched: settings,
                 browser_args,
             });
@@ -204,6 +254,10 @@ fn main() {
             }
             #[cfg(not(windows))]
             let _ = (window, swaps);
+
+            if check_for_updates {
+                updates::spawn_startup_check(app.handle().clone());
+            }
 
             Ok(())
         })

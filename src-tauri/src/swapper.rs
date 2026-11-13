@@ -147,7 +147,7 @@ mod windows_impl {
             unsafe { core.Navigate(&HSTRING::from(url)) }
         });
         if let Err(err) = result {
-            eprintln!("[krust] resource swapper failed to start: {err}");
+            log::error!("resource swapper failed to start: {err}");
         }
     }
 
@@ -183,7 +183,7 @@ mod windows_impl {
                     return Ok(());
                 };
                 let Ok(body) = fs::read(path) else {
-                    eprintln!("[krust] swap file unreadable: {}", path.display());
+                    log::warn!("swap file unreadable: {}", path.display());
                     return Ok(());
                 };
 

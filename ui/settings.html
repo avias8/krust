@@ -82,6 +82,8 @@
   button:hover { background: #333845; }
   button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
   button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .5; cursor: default; }
+  button[hidden] { display: none; }
 
   input[type="text"] {
     width: 100%;
@@ -174,6 +176,25 @@
   </section>
 
   <section>
+    <h2>Updates</h2>
+    <div class="row">
+      <div class="label">
+        <strong>Krust <span id="version"></span></strong>
+        <span id="update-status">Updates are signed; Krust only installs ones it can verify.</span>
+      </div>
+      <button id="check-update">Check now</button>
+      <button class="primary" id="install-update" hidden>Update now</button>
+    </div>
+    <div class="row">
+      <div class="label">
+        <strong>Check for updates at launch</strong>
+        <span>Krust always asks before installing.</span>
+      </div>
+      <label class="switch"><input type="checkbox" data-key="check_for_updates" aria-label="Check for updates at launch"><span class="track"></span></label>
+    </div>
+  </section>
+
+  <section>
     <h2>Shortcuts</h2>
     <div class="keys">
       <kbd>F1</kbd><span>Open these settings</span>
@@ -198,6 +219,13 @@
           <span>Where Krust keeps settings.json, swaps and scripts.</span>
         </div>
         <button data-folder="config">Open</button>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Logs</strong>
+          <span>Attach <code>krust.log</code> when reporting a problem.</span>
+        </div>
+        <button data-folder="logs">Open</button>
       </div>
     </details>
   </section>
@@ -224,8 +252,17 @@
     errorBox.style.display = 'block';
   }
 
+  const statusBox = document.getElementById('update-status');
+  const checkButton = document.getElementById('check-update');
+  const installButton = document.getElementById('install-update');
+
   function render(view) {
     current = view.settings;
+    document.getElementById('version').textContent = view.version;
+    if (!view.updates_configured) {
+      statusBox.textContent = 'This is a development build, which does not update itself.';
+      checkButton.disabled = true;
+    }
     for (const input of document.querySelectorAll('[data-key]')) {
       const value = current[input.dataset.key];
       if (input.type === 'checkbox') input.checked = value;
@@ -253,6 +290,35 @@
     button.addEventListener('click', () =>
       invoke('open_folder', { folder: button.dataset.folder }).catch(showError));
   }
+
+  checkButton.addEventListener('click', async () => {
+    checkButton.disabled = true;
+    statusBox.textContent = 'Checking…';
+    try {
+      const info = await invoke('check_update');
+      if (info.available) {
+        statusBox.textContent = 'Version ' + info.available + ' is available.';
+        installButton.hidden = false;
+      } else {
+        statusBox.textContent = 'You have the latest version.';
+      }
+    } catch (err) {
+      statusBox.textContent = 'Could not check for updates: ' + err;
+    } finally {
+      checkButton.disabled = false;
+    }
+  });
+
+  installButton.addEventListener('click', async () => {
+    installButton.disabled = checkButton.disabled = true;
+    statusBox.textContent = 'Downloading and verifying… Krust will close to install it.';
+    try {
+      await invoke('install_update');
+    } catch (err) {
+      statusBox.textContent = 'The update failed: ' + err;
+      installButton.disabled = checkButton.disabled = false;
+    }
+  });
 
   document.getElementById('restart').addEventListener('click', () =>
     invoke('restart').catch(showError));
