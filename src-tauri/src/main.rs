@@ -10,8 +10,7 @@ const GAME_URL: &str = "https://krunker.io/";
 
 /// wry passes these to WebView2 by default. Setting our own browser arguments
 /// replaces the defaults, so they have to be repeated.
-const DEFAULT_BROWSER_ARGS: &str =
-    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
+const DEFAULT_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
 
 /// Chromium switches that lift the display-refresh frame cap.
 const UNCAP_FPS_ARGS: &str = "--disable-frame-rate-limit --disable-gpu-vsync";
@@ -25,6 +24,9 @@ struct Settings {
     fullscreen: bool,
     width: f64,
     height: f64,
+    /// Extra Chromium switches appended to the WebView2 command line, for
+    /// experimenting with flags without rebuilding.
+    extra_browser_args: String,
 }
 
 impl Default for Settings {
@@ -34,6 +36,7 @@ impl Default for Settings {
             fullscreen: false,
             width: 1280.0,
             height: 720.0,
+            extra_browser_args: String::new(),
         }
     }
 }
@@ -43,10 +46,13 @@ impl Default for Settings {
 fn load_settings(config_dir: &Path) -> Settings {
     let path = config_dir.join("settings.json");
     match fs::read_to_string(&path) {
-        Ok(text) => serde_json::from_str(&text).unwrap_or_else(|err| {
-            eprintln!("settings.json is invalid ({err}); using defaults");
-            Settings::default()
-        }),
+        // Windows editors and PowerShell often prepend a byte-order mark.
+        Ok(text) => {
+            serde_json::from_str(text.trim_start_matches('\u{feff}')).unwrap_or_else(|err| {
+                eprintln!("settings.json is invalid ({err}); using defaults");
+                Settings::default()
+            })
+        }
         Err(_) => {
             let settings = Settings::default();
             if let Ok(text) = serde_json::to_string_pretty(&settings) {
@@ -58,11 +64,17 @@ fn load_settings(config_dir: &Path) -> Settings {
 }
 
 fn browser_args(settings: &Settings) -> String {
+    let mut args = DEFAULT_BROWSER_ARGS.to_string();
     if settings.uncap_fps {
-        format!("{DEFAULT_BROWSER_ARGS} {UNCAP_FPS_ARGS}")
-    } else {
-        DEFAULT_BROWSER_ARGS.to_string()
+        args.push(' ');
+        args.push_str(UNCAP_FPS_ARGS);
     }
+    let extra = settings.extra_browser_args.trim();
+    if !extra.is_empty() {
+        args.push(' ');
+        args.push_str(extra);
+    }
+    args
 }
 
 /// Returns `(file name, source)` for every `.js` file in `dir`, sorted by
@@ -144,6 +156,15 @@ mod tests {
             ..Settings::default()
         };
         assert_eq!(browser_args(&settings), DEFAULT_BROWSER_ARGS);
+    }
+
+    #[test]
+    fn extra_args_are_appended_last() {
+        let settings = Settings {
+            extra_browser_args: "  --foo=1 ".into(),
+            ..Settings::default()
+        };
+        assert!(browser_args(&settings).ends_with(" --foo=1"));
     }
 
     #[test]

@@ -8,7 +8,9 @@ Unofficial. Not affiliated with Krunker or FRVR.
 
 ## Status
 
-Early scaffold. The code has not been compiled or run yet.
+Early, but it builds and runs. Measured on Windows 11 with WebView2 157 and a
+240 Hz display, on a live Krunker game page: 240 FPS with `uncap_fps` off and
+about 920 FPS with it on. Long-session stability is not yet tested.
 
 - Opens krunker.io in a native window
 - Optional uncapped frame rate (WebView2 browser arguments)
@@ -31,6 +33,10 @@ npm install
 npm run dev
 ```
 
+If the project lives under a long path, the MSVC linker can fail with
+`LNK1104`. Point Cargo at a short build directory first, for example
+`$env:CARGO_TARGET_DIR = "$env:LOCALAPPDATA\krust-target"`.
+
 Build an installer with `npm run build`. Run the unit tests with
 `cargo test` inside `src-tauri`.
 
@@ -46,6 +52,7 @@ Both live in the app config directory, `%APPDATA%\dev.krust.client`:
   | `fullscreen` | `false` | Start in fullscreen                  |
   | `width`      | `1280`  | Window width                         |
   | `height`     | `720`   | Window height                        |
+  | `extra_browser_args` | `""` | Extra Chromium switches for WebView2 |
 
 - `scripts\*.js` are injected into Krunker pages before the game's own
   scripts, in file-name order. Changes apply on the next launch.
