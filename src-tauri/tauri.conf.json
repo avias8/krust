@@ -27,7 +27,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg3Q0VDRjg0RjZEQzg4RkQKUldUOWlOejJoTS9PaDNNcmZOTlZ3Ri9kNzZ6dFV0dUhoTldRaWRkakhkamI1WXlKMkJpLzMvMFcK",
       "endpoints": [
         "https://github.com/avias8/krust/releases/latest/download/latest.json"
       ],
