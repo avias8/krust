@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Krust settings</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #15171c;
+    --panel: #1d2027;
+    --line: #2b2f38;
+    --text: #e8eaee;
+    --muted: #9aa1ad;
+    --accent: #e0702a;
+    --accent-text: #1a0d04;
+    --warn-bg: #3a2a12;
+    --warn-line: #7a5521;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+    user-select: none;
+  }
+  main { padding: 20px 20px 96px; max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  section h2 {
+    font-size: 12px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+    padding: 12px 16px 4px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+  }
+  .row + .row { border-top: 1px solid var(--line); }
+  .label { flex: 1; min-width: 0; }
+  .label strong { display: block; font-weight: 600; }
+  .label span { color: var(--muted); font-size: 13px; }
+
+  /* Toggle switch built on a real checkbox, so keyboard and screen readers work. */
+  .switch { position: relative; width: 42px; height: 24px; flex: none; }
+  .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .switch .track {
+    position: absolute; inset: 0; border-radius: 12px;
+    background: #3a3f4a; transition: background .15s;
+  }
+  .switch .track::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; transition: transform .15s;
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::after { transform: translateX(18px); }
+  .switch input:focus-visible + .track { outline: 2px solid #fff; outline-offset: 2px; }
+
+  button {
+    font: inherit;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: #2a2e37;
+    color: var(--text);
+    padding: 7px 12px;
+    cursor: pointer;
+    flex: none;
+  }
+  button:hover { background: #333845; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+
+  input[type="text"] {
+    width: 100%;
+    margin-top: 8px;
+    font: 13px Consolas, monospace;
+    color: var(--text);
+    background: #121419;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 7px 9px;
+    user-select: text;
+  }
+  details summary { cursor: pointer; padding: 12px 16px; color: var(--muted); }
+  details[open] summary { border-bottom: 1px solid var(--line); }
+
+  kbd {
+    font: 12px Consolas, monospace;
+    background: #2a2e37;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+  }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; padding: 8px 16px 14px; }
+
+  .banner {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 20px;
+    background: var(--warn-bg);
+    border-top: 1px solid var(--warn-line);
+    transform: translateY(100%);
+    transition: transform .2s;
+  }
+  .banner.show { transform: none; }
+  .banner p { flex: 1; margin: 0; }
+  .error { color: #ff8a80; padding: 0 16px 12px; display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Krust settings</h1>
+  <p class="sub">Changes save automatically.</p>
+
+  <section>
+    <h2>Performance</h2>
+    <div class="row">
+      <div class="label">
+        <strong>Uncapped frame rate</strong>
+        <span>Render as fast as your PC can, instead of matching your monitor's refresh rate.</span>
+      </div>
+      <label class="switch"><input type="checkbox" data-key="uncap_fps" aria-label="Uncapped frame rate"><span class="track"></span></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Display</h2>
+    <div class="row">
+      <div class="label">
+        <strong>Start in fullscreen</strong>
+        <span>Press <kbd>F11</kbd> at any time to switch.</span>
+      </div>
+      <label class="switch"><input type="checkbox" data-key="fullscreen" aria-label="Start in fullscreen"><span class="track"></span></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Customization</h2>
+    <div class="row">
+      <div class="label">
+        <strong>Resource swapper</strong>
+        <span>Replace game textures and sounds with files from your swap folder.</span>
+      </div>
+      <label class="switch"><input type="checkbox" data-key="resource_swapper" aria-label="Resource swapper"><span class="track"></span></label>
+    </div>
+    <div class="row">
+      <div class="label">
+        <strong>Swap folder</strong>
+        <span>Mirror Krunker's paths, e.g. <code>textures\weapons\weapon_2.png</code>.</span>
+      </div>
+      <button data-folder="swap">Open</button>
+    </div>
+    <div class="row">
+      <div class="label">
+        <strong>Userscripts</strong>
+        <span>Drop <code>.js</code> files here. Only use scripts you trust.</span>
+      </div>
+      <button data-folder="scripts">Open</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Shortcuts</h2>
+    <div class="keys">
+      <kbd>F1</kbd><span>Open these settings</span>
+      <kbd>F5</kbd><span>Reload the game</span>
+      <kbd>F11</kbd><span>Toggle fullscreen</span>
+    </div>
+  </section>
+
+  <section>
+    <details>
+      <summary>Advanced</summary>
+      <div class="row">
+        <div class="label">
+          <strong>Extra browser arguments</strong>
+          <span>Chromium switches passed to WebView2. Wrong values can stop Krust from starting; clear this box to undo.</span>
+          <input type="text" data-key="extra_browser_args" spellcheck="false" placeholder="--example-flag">
+        </div>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Settings folder</strong>
+          <span>Where Krust keeps settings.json, swaps and scripts.</span>
+        </div>
+        <button data-folder="config">Open</button>
+      </div>
+    </details>
+  </section>
+
+  <p class="error" id="error" role="alert"></p>
+</main>
+
+<div class="banner" id="banner" role="status">
+  <p>Restart Krust to apply your changes.</p>
+  <button class="primary" id="restart">Restart now</button>
+</div>
+
+<script>
+  // Tauri's IPC bridge. @tauri-apps/api's invoke() is a thin wrapper over
+  // this; calling it directly avoids needing a bundler for one page.
+  const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
+
+  const errorBox = document.getElementById('error');
+  const banner = document.getElementById('banner');
+  let current = null;
+
+  function showError(err) {
+    errorBox.textContent = 'Something went wrong: ' + err;
+    errorBox.style.display = 'block';
+  }
+
+  function render(view) {
+    current = view.settings;
+    for (const input of document.querySelectorAll('[data-key]')) {
+      const value = current[input.dataset.key];
+      if (input.type === 'checkbox') input.checked = value;
+      else if (document.activeElement !== input) input.value = value;
+    }
+    banner.classList.toggle('show', view.needs_restart);
+  }
+
+  async function save(patch) {
+    try {
+      errorBox.style.display = 'none';
+      render(await invoke('save_settings', { settings: { ...current, ...patch } }));
+    } catch (err) {
+      showError(err);
+    }
+  }
+
+  for (const input of document.querySelectorAll('[data-key]')) {
+    const key = input.dataset.key;
+    input.addEventListener('change', () =>
+      save({ [key]: input.type === 'checkbox' ? input.checked : input.value }));
+  }
+
+  for (const button of document.querySelectorAll('[data-folder]')) {
+    button.addEventListener('click', () =>
+      invoke('open_folder', { folder: button.dataset.folder }).catch(showError));
+  }
+
+  document.getElementById('restart').addEventListener('click', () =>
+    invoke('restart').catch(showError));
+
+  invoke('get_settings').then(render).catch(showError);
+</script>
+</body>
+</html>

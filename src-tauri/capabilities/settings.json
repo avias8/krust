@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "The bundled settings page. Applies to local content only; remote pages such as krunker.io get no IPC access.",
+  "windows": ["settings"],
+  "permissions": [
+    "core:default",
+    "allow-get-settings",
+    "allow-save-settings",
+    "allow-open-folder",
+    "allow-restart"
+  ]
+}

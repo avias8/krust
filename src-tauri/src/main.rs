@@ -1,121 +1,150 @@
 // Hide the console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod settings;
+#[cfg(windows)]
+mod shortcuts;
 mod swapper;
+mod userscripts;
 
-use std::{fs, path::Path};
+use std::{fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use settings::Settings;
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const GAME_URL: &str = "https://krunker.io/";
+const MAIN_TITLE: &str = "Krust  \u{2014}  F1 settings";
 
-/// wry passes these to WebView2 by default. Setting our own browser arguments
-/// replaces the defaults, so they have to be repeated.
-const DEFAULT_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
-
-/// Chromium switches that lift the display-refresh frame cap.
-const UNCAP_FPS_ARGS: &str = "--disable-frame-rate-limit --disable-gpu-vsync";
-
-/// User settings, stored as `settings.json` in the app config directory.
-/// Missing keys fall back to their defaults, so old files keep working.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-struct Settings {
-    uncap_fps: bool,
-    fullscreen: bool,
-    width: f64,
-    height: f64,
-    /// Extra Chromium switches appended to the WebView2 command line, for
-    /// experimenting with flags without rebuilding.
-    extra_browser_args: String,
-    /// Serve files from the `swap` folder in place of Krunker's assets.
-    resource_swapper: bool,
+/// Fixed for the life of the process.
+struct AppState {
+    config_dir: PathBuf,
+    /// Settings as they were at launch, to tell the user when a change
+    /// needs a restart.
+    launched: Settings,
+    /// Every webview in the process shares one WebView2 environment, which
+    /// fails to start a second window with different browser arguments.
+    browser_args: String,
 }
 
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            uncap_fps: true,
-            fullscreen: false,
-            width: 1280.0,
-            height: 720.0,
-            extra_browser_args: String::new(),
-            resource_swapper: true,
-        }
-    }
+/// Keyboard shortcuts, handled natively before the game sees the key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Action {
+    OpenSettings,
+    Reload,
+    ToggleFullscreen,
 }
 
-/// Reads settings, writing a default file on first run. A file that fails to
-/// parse is left untouched and defaults are used for this session.
-fn load_settings(config_dir: &Path) -> Settings {
-    let path = config_dir.join("settings.json");
-    match fs::read_to_string(&path) {
-        // Windows editors and PowerShell often prepend a byte-order mark.
-        Ok(text) => {
-            serde_json::from_str(text.trim_start_matches('\u{feff}')).unwrap_or_else(|err| {
-                eprintln!("settings.json is invalid ({err}); using defaults");
-                Settings::default()
-            })
-        }
-        Err(_) => {
-            let settings = Settings::default();
-            if let Ok(text) = serde_json::to_string_pretty(&settings) {
-                let _ = fs::write(&path, text);
+/// Runs a shortcut action. Called from a spare thread: window calls made on
+/// the WebView2 event thread can deadlock waiting for that same thread.
+pub fn run_action(app: &AppHandle, action: Action) {
+    match action {
+        Action::OpenSettings => open_settings(app),
+        Action::Reload => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.reload();
             }
-            settings
+        }
+        Action::ToggleFullscreen => {
+            if let Some(window) = app.get_webview_window("main") {
+                let on = window.is_fullscreen().unwrap_or(false);
+                let _ = window.set_fullscreen(!on);
+            }
         }
     }
 }
 
-fn browser_args(settings: &Settings) -> String {
-    let mut args = DEFAULT_BROWSER_ARGS.to_string();
-    if settings.uncap_fps {
-        args.push(' ');
-        args.push_str(UNCAP_FPS_ARGS);
+fn open_settings(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("settings") {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        return;
     }
-    let extra = settings.extra_browser_args.trim();
-    if !extra.is_empty() {
-        args.push(' ');
-        args.push_str(extra);
+    let state = app.state::<AppState>();
+    let result =
+        WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+            .title("Krust settings")
+            .inner_size(460.0, 640.0)
+            .min_inner_size(400.0, 480.0)
+            .additional_browser_args(&state.browser_args)
+            .build();
+    if let Err(err) = result {
+        eprintln!("[krust] could not open settings: {err}");
     }
-    args
 }
 
-/// Returns `(file name, source)` for every `.js` file in `dir`, sorted by
-/// name so the load order is predictable.
-fn load_userscripts(dir: &Path) -> Vec<(String, String)> {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return Vec::new();
+// ---- Commands for the settings page. Only the local settings window may
+// ---- call these; see capabilities/settings.json.
+
+#[derive(Serialize)]
+struct SettingsView {
+    settings: Settings,
+    needs_restart: bool,
+}
+
+fn view(state: &AppState, settings: Settings) -> SettingsView {
+    SettingsView {
+        needs_restart: state.launched.needs_restart_for(&settings),
+        settings,
+    }
+}
+
+#[tauri::command]
+fn get_settings(state: State<AppState>) -> SettingsView {
+    view(&state, settings::load(&state.config_dir))
+}
+
+#[tauri::command]
+fn save_settings(state: State<AppState>, settings: Settings) -> Result<SettingsView, String> {
+    settings::save(&state.config_dir, &settings).map_err(|err| err.to_string())?;
+    Ok(view(&state, settings))
+}
+
+/// The page picks a folder by name, never by path, so it cannot open
+/// arbitrary locations.
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Folder {
+    Config,
+    Swap,
+    Scripts,
+}
+
+#[tauri::command]
+fn open_folder(state: State<AppState>, folder: Folder) -> Result<(), String> {
+    let path = match folder {
+        Folder::Config => state.config_dir.clone(),
+        Folder::Swap => state.config_dir.join("swap"),
+        Folder::Scripts => state.config_dir.join("scripts"),
     };
-    let mut scripts: Vec<(String, String)> = entries
-        .flatten()
-        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "js"))
-        .filter_map(|entry| {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            fs::read_to_string(entry.path()).ok().map(|src| (name, src))
-        })
-        .collect();
-    scripts.sort_by(|a, b| a.0.cmp(&b.0));
-    scripts
+    fs::create_dir_all(&path).map_err(|err| err.to_string())?;
+    #[cfg(windows)]
+    std::process::Command::new("explorer")
+        .arg(&path)
+        .spawn()
+        .map_err(|err| err.to_string())?;
+    Ok(())
 }
 
-/// Wraps a userscript so it only runs on Krunker pages and so an error in one
-/// script cannot stop the others or the game.
-fn wrap_userscript(name: &str, source: &str) -> String {
-    let label = serde_json::to_string(name).unwrap_or_else(|_| "\"userscript\"".into());
-    format!(
-        "(function () {{\n\
-         if (!/(^|\\.)krunker\\.io$/.test(location.hostname)) return;\n\
-         try {{\n{source}\n}} catch (err) {{\n\
-         console.error('[krust] userscript ' + {label} + ' failed:', err);\n\
-         }}\n\
-         }})();"
-    )
+#[tauri::command]
+fn restart(app: AppHandle) {
+    app.restart();
 }
 
 fn main() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            get_settings,
+            save_settings,
+            open_folder,
+            restart
+        ])
+        .on_window_event(|window, event| {
+            // Closing the game closes Krust, even with settings still open.
+            if window.label() == "main" && matches!(event, WindowEvent::Destroyed) {
+                window.app_handle().exit(0);
+            }
+        })
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
             let scripts_dir = config_dir.join("scripts");
@@ -123,7 +152,8 @@ fn main() {
             fs::create_dir_all(&scripts_dir)?;
             fs::create_dir_all(&swap_dir)?;
 
-            let settings = load_settings(&config_dir);
+            let settings = settings::load(&config_dir);
+            let browser_args = settings.browser_args();
 
             let swaps = if settings.resource_swapper && cfg!(windows) {
                 swapper::SwapIndex::scan(&swap_dir)
@@ -145,20 +175,32 @@ fn main() {
             // access to Tauri's IPC, so the page cannot call into Rust.
             let mut window =
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::External(start_url.parse()?))
-                    .title("Krust")
+                    .title(MAIN_TITLE)
                     .inner_size(settings.width, settings.height)
                     .fullscreen(settings.fullscreen)
-                    .additional_browser_args(&browser_args(&settings));
+                    .additional_browser_args(&browser_args);
 
-            for (name, source) in load_userscripts(&scripts_dir) {
-                window = window.initialization_script(&wrap_userscript(&name, &source));
+            for (name, source) in userscripts::load(&scripts_dir) {
+                window = window.initialization_script(&userscripts::wrap(&name, &source));
             }
+
+            app.manage(AppState {
+                config_dir,
+                launched: settings,
+                browser_args,
+            });
 
             let window = window.build()?;
 
             #[cfg(windows)]
-            if !swaps.is_empty() {
-                window.with_webview(move |webview| swapper::attach(webview, swaps, GAME_URL))?;
+            {
+                let handle = app.handle().clone();
+                window.with_webview(move |webview| {
+                    shortcuts::attach(&webview, handle);
+                    if !swaps.is_empty() {
+                        swapper::attach(webview, swaps, GAME_URL);
+                    }
+                })?;
             }
             #[cfg(not(windows))]
             let _ = (window, swaps);
@@ -167,48 +209,4 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Krust");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn uncapped_args_keep_the_wry_defaults() {
-        let args = browser_args(&Settings::default());
-        assert!(args.starts_with(DEFAULT_BROWSER_ARGS));
-        assert!(args.contains("--disable-frame-rate-limit"));
-    }
-
-    #[test]
-    fn capped_args_are_only_the_defaults() {
-        let settings = Settings {
-            uncap_fps: false,
-            ..Settings::default()
-        };
-        assert_eq!(browser_args(&settings), DEFAULT_BROWSER_ARGS);
-    }
-
-    #[test]
-    fn extra_args_are_appended_last() {
-        let settings = Settings {
-            extra_browser_args: "  --foo=1 ".into(),
-            ..Settings::default()
-        };
-        assert!(browser_args(&settings).ends_with(" --foo=1"));
-    }
-
-    #[test]
-    fn partial_settings_fall_back_to_defaults() {
-        let settings: Settings = serde_json::from_str(r#"{ "fullscreen": true }"#).unwrap();
-        assert!(settings.fullscreen);
-        assert_eq!(settings.width, Settings::default().width);
-    }
-
-    #[test]
-    fn userscript_wrapper_escapes_the_file_name() {
-        let wrapped = wrap_userscript("it's \"mine\".js", "let a = 1;");
-        assert!(wrapped.contains("let a = 1;"));
-        assert!(wrapped.contains(r#""it's \"mine\".js""#));
-    }
 }

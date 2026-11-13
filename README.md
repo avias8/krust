@@ -16,9 +16,19 @@ about 920 FPS with it on. Long-session stability is not yet tested.
 - Optional uncapped frame rate (WebView2 browser arguments)
 - Userscript loader
 - Resource swapper, compatible with Crankshaft-style swap folders
-- JSON settings file
+- Settings window (<kbd>F1</kbd>) and keyboard shortcuts
 
-Planned: settings UI, ad and tracker blocking, Discord presence.
+Planned: auto-updater, ad and tracker blocking, Discord presence.
+
+## Keyboard shortcuts
+
+| Key | Action |
+| --- | ------ |
+| <kbd>F1</kbd> | Open the settings window |
+| <kbd>F5</kbd> | Reload the game |
+| <kbd>F11</kbd> | Toggle fullscreen |
+
+Shortcuts are handled natively, before the key reaches the game.
 
 ## Requirements
 
@@ -42,9 +52,12 @@ Build an installer with `npm run build`. Run the unit tests with
 
 ## Settings, userscripts and swaps
 
-All live in the app config directory, `%APPDATA%\dev.krust.client`:
+All live in the app config directory, `%APPDATA%\dev.krust.client`. The
+settings window (<kbd>F1</kbd>) edits them and opens these folders for you.
 
-- `settings.json` is created on first run:
+- `settings.json` is created on first run. Changes to frame rate, the
+  swapper and browser arguments apply after a restart; the settings window
+  says when one is needed and offers a restart button.
 
   | Key          | Default | Meaning                              |
   | ------------ | ------- | ------------------------------------ |
@@ -73,7 +86,11 @@ All live in the app config directory, `%APPDATA%\dev.krust.client`:
 ## Security
 
 The game is remote content and gets no access to Tauri's IPC, so the page
-cannot call into the Rust side. Userscripts run with the page's privileges;
+cannot call into the Rust side. The settings commands are declared in
+`build.rs`, which makes Tauri deny them by default, and
+`capabilities/settings.json` grants them only to the bundled settings
+window. The folder command takes a name (`swap`, `scripts`, `config`),
+never a path. Userscripts run with the page's privileges;
 only install ones you trust.
 
 The swapper only serves files found when the `swap` folder was scanned, so
