@@ -15,10 +15,10 @@ about 920 FPS with it on. Long-session stability is not yet tested.
 - Opens krunker.io in a native window
 - Optional uncapped frame rate (WebView2 browser arguments)
 - Userscript loader
+- Resource swapper, compatible with Crankshaft-style swap folders
 - JSON settings file
 
-Planned: resource swapper, settings UI, ad and tracker blocking, Discord
-presence.
+Planned: settings UI, ad and tracker blocking, Discord presence.
 
 ## Requirements
 
@@ -40,9 +40,9 @@ If the project lives under a long path, the MSVC linker can fail with
 Build an installer with `npm run build`. Run the unit tests with
 `cargo test` inside `src-tauri`.
 
-## Settings and userscripts
+## Settings, userscripts and swaps
 
-Both live in the app config directory, `%APPDATA%\dev.krust.client`:
+All live in the app config directory, `%APPDATA%\dev.krust.client`:
 
 - `settings.json` is created on first run:
 
@@ -53,15 +53,32 @@ Both live in the app config directory, `%APPDATA%\dev.krust.client`:
   | `width`      | `1280`  | Window width                         |
   | `height`     | `720`   | Window height                        |
   | `extra_browser_args` | `""` | Extra Chromium switches for WebView2 |
+  | `resource_swapper` | `true` | Serve files from the `swap` folder |
 
 - `scripts\*.js` are injected into Krunker pages before the game's own
   scripts, in file-name order. Changes apply on the next launch.
+
+- `swap\` replaces Krunker's assets with your own files. Mirror the URL
+  path: `swap\textures\weapons\weapon_2.png` replaces
+  `https://assets.krunker.io/textures/weapons/weapon_2.png` (and the same
+  path on any `krunker.io` subdomain, with or without an `/assets` prefix).
+  Query strings are ignored, so swaps survive game updates. Swap packs made
+  for Crankshaft work unchanged. The folder is scanned at launch, so restart
+  after adding or removing files; edits to an existing file apply on the
+  next load of that file.
+
+  Swapped responses are sent with `Cache-Control: no-store`, so a removed
+  swap never lingers in the browser cache.
 
 ## Security
 
 The game is remote content and gets no access to Tauri's IPC, so the page
 cannot call into the Rust side. Userscripts run with the page's privileges;
 only install ones you trust.
+
+The swapper only serves files found when the `swap` folder was scanned, so
+a crafted URL such as `/../../Windows/win.ini` cannot reach anything else on
+disk.
 
 ## Credits
 

@@ -1,6 +1,8 @@
 // Hide the console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod swapper;
+
 use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
@@ -27,6 +29,8 @@ struct Settings {
     /// Extra Chromium switches appended to the WebView2 command line, for
     /// experimenting with flags without rebuilding.
     extra_browser_args: String,
+    /// Serve files from the `swap` folder in place of Krunker's assets.
+    resource_swapper: bool,
 }
 
 impl Default for Settings {
@@ -37,6 +41,7 @@ impl Default for Settings {
             width: 1280.0,
             height: 720.0,
             extra_browser_args: String::new(),
+            resource_swapper: true,
         }
     }
 }
@@ -114,14 +119,32 @@ fn main() {
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
             let scripts_dir = config_dir.join("scripts");
+            let swap_dir = config_dir.join("swap");
             fs::create_dir_all(&scripts_dir)?;
+            fs::create_dir_all(&swap_dir)?;
 
             let settings = load_settings(&config_dir);
+
+            let swaps = if settings.resource_swapper && cfg!(windows) {
+                swapper::SwapIndex::scan(&swap_dir)
+            } else {
+                swapper::SwapIndex::default()
+            };
+            if !swaps.is_empty() {
+                eprintln!("[krust] swapping {} file(s)", swaps.len());
+            }
+
+            // With swaps, start blank and navigate once the swapper is ready.
+            let start_url = if swaps.is_empty() {
+                GAME_URL
+            } else {
+                "about:blank"
+            };
 
             // The game is remote content. No capability grants krunker.io
             // access to Tauri's IPC, so the page cannot call into Rust.
             let mut window =
-                WebviewWindowBuilder::new(app, "main", WebviewUrl::External(GAME_URL.parse()?))
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::External(start_url.parse()?))
                     .title("Krust")
                     .inner_size(settings.width, settings.height)
                     .fullscreen(settings.fullscreen)
@@ -131,7 +154,15 @@ fn main() {
                 window = window.initialization_script(&wrap_userscript(&name, &source));
             }
 
-            window.build()?;
+            let window = window.build()?;
+
+            #[cfg(windows)]
+            if !swaps.is_empty() {
+                window.with_webview(move |webview| swapper::attach(webview, swaps, GAME_URL))?;
+            }
+            #[cfg(not(windows))]
+            let _ = (window, swaps);
+
             Ok(())
         })
         .run(tauri::generate_context!())
