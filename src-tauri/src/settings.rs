@@ -23,8 +23,6 @@ pub struct Settings {
     /// Extra Chromium switches appended to the WebView2 command line, for
     /// experimenting with flags without rebuilding.
     pub extra_browser_args: String,
-    /// Serve files from the `swap` folder in place of Krunker's assets.
-    pub resource_swapper: bool,
     /// Look for a new version shortly after launch and offer to install it.
     pub check_for_updates: bool,
 }
@@ -40,7 +38,6 @@ impl Default for Settings {
             width: 1280.0,
             height: 720.0,
             extra_browser_args: String::new(),
-            resource_swapper: true,
             check_for_updates: true,
         }
     }
@@ -48,11 +45,9 @@ impl Default for Settings {
 
 impl Settings {
     /// True when switching from `self` to `other` only takes effect after a
-    /// restart. Browser arguments are fixed when WebView2 starts, and the
-    /// swap folder is scanned once at launch.
+    /// restart. Browser arguments are fixed when WebView2 starts.
     pub fn needs_restart_for(&self, other: &Settings) -> bool {
         self.uncap_fps != other.uncap_fps
-            || self.resource_swapper != other.resource_swapper
             || self.extra_browser_args.trim() != other.extra_browser_args.trim()
     }
 

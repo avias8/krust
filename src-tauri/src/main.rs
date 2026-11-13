@@ -4,9 +4,7 @@
 mod settings;
 #[cfg(windows)]
 mod shortcuts;
-mod swapper;
 mod updates;
-mod userscripts;
 
 use std::{fs, path::PathBuf};
 
@@ -127,8 +125,6 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
 #[serde(rename_all = "lowercase")]
 enum Folder {
     Config,
-    Swap,
-    Scripts,
     Logs,
 }
 
@@ -136,8 +132,6 @@ enum Folder {
 fn open_folder(state: State<AppState>, folder: Folder) -> Result<(), String> {
     let path = match folder {
         Folder::Config => state.config_dir.clone(),
-        Folder::Swap => state.config_dir.join("swap"),
-        Folder::Scripts => state.config_dir.join("scripts"),
         Folder::Logs => state.log_dir.clone(),
     };
     fs::create_dir_all(&path).map_err(|err| err.to_string())?;
@@ -195,42 +189,20 @@ fn main() {
             log::info!("Krust {} starting", app.package_info().version);
             let config_dir = app.path().app_config_dir()?;
             let log_dir = app.path().app_log_dir()?;
-            let scripts_dir = config_dir.join("scripts");
-            let swap_dir = config_dir.join("swap");
-            fs::create_dir_all(&scripts_dir)?;
-            fs::create_dir_all(&swap_dir)?;
+            fs::create_dir_all(&config_dir)?;
 
             let settings = settings::load(&config_dir);
             let browser_args = settings.browser_args();
 
-            let swaps = if settings.resource_swapper && cfg!(windows) {
-                swapper::SwapIndex::scan(&swap_dir)
-            } else {
-                swapper::SwapIndex::default()
-            };
-            if !swaps.is_empty() {
-                log::info!("swapping {} file(s)", swaps.len());
-            }
-
-            // With swaps, start blank and navigate once the swapper is ready.
-            let start_url = if swaps.is_empty() {
-                GAME_URL
-            } else {
-                "about:blank"
-            };
-
-            // The game is remote content. No capability grants krunker.io
-            // access to Tauri's IPC, so the page cannot call into Rust.
-            let mut window =
-                WebviewWindowBuilder::new(app, "main", WebviewUrl::External(start_url.parse()?))
+            // The game loads exactly as it does in a browser: Krust injects
+            // no scripts and changes no game files. It is remote content, and
+            // no capability grants krunker.io access to Tauri's IPC.
+            let window =
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::External(GAME_URL.parse()?))
                     .title(MAIN_TITLE)
                     .inner_size(settings.width, settings.height)
                     .fullscreen(settings.fullscreen)
                     .additional_browser_args(&browser_args);
-
-            for (name, source) in userscripts::load(&scripts_dir) {
-                window = window.initialization_script(userscripts::wrap(&name, &source));
-            }
 
             let check_for_updates = settings.check_for_updates;
             app.manage(AppState {
@@ -245,15 +217,10 @@ fn main() {
             #[cfg(windows)]
             {
                 let handle = app.handle().clone();
-                window.with_webview(move |webview| {
-                    shortcuts::attach(&webview, handle);
-                    if !swaps.is_empty() {
-                        swapper::attach(webview, swaps, GAME_URL);
-                    }
-                })?;
+                window.with_webview(move |webview| shortcuts::attach(&webview, handle))?;
             }
             #[cfg(not(windows))]
-            let _ = (window, swaps);
+            let _ = window;
 
             if check_for_updates {
                 updates::spawn_startup_check(app.handle().clone());

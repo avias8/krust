@@ -10,6 +10,10 @@ stays current through Windows and Edge updates.
 
 Unofficial. Not affiliated with Krunker or FRVR.
 
+Krust is a plain game window. It loads krunker.io exactly as a browser
+would and does not inject scripts, replace game files or change how the
+game plays.
+
 ## Install
 
 1. Download `Krust_x.y.z_x64-setup.exe` from the
@@ -30,8 +34,6 @@ SmartScreen may show "Windows protected your PC" the first time. Choose
 
 - Opens krunker.io in a native window
 - Optional uncapped frame rate (off by default; see Status)
-- Userscript loader
-- Resource swapper, compatible with Crankshaft-style swap folders
 - Settings window (<kbd>F1</kbd>) and keyboard shortcuts
 - Signed automatic updates
 - Log file for bug reports (Settings → Advanced → Logs)
@@ -85,39 +87,23 @@ Build an installer with `npm run build`. It lands in
 `<target dir>\release\bundle\nsis\`. Run the unit tests with `cargo test`
 inside `src-tauri`.
 
-## Settings, userscripts and swaps
+## Settings
 
-All live in the app config directory, `%APPDATA%\dev.krust.client`. The
-settings window (<kbd>F1</kbd>) edits them and opens these folders for you.
+Settings live in `%APPDATA%\dev.krust.client\settings.json`, which the
+settings window (<kbd>F1</kbd>) edits for you. Changes to the frame rate and
+browser arguments apply after a restart; the settings window says when one
+is needed and offers a restart button.
 
-- `settings.json` is created on first run. Changes to frame rate, the
-  swapper and browser arguments apply after a restart; the settings window
-  says when one is needed and offers a restart button.
+| Key | Default | Meaning |
+| --- | ------- | ------- |
+| `uncap_fps` | `false` | Lift the display-refresh frame cap (can stutter) |
+| `fullscreen` | `false` | Start in fullscreen |
+| `width` | `1280` | Window width |
+| `height` | `720` | Window height |
+| `extra_browser_args` | `""` | Extra Chromium switches for WebView2 |
+| `check_for_updates` | `true` | Look for updates at launch |
 
-  | Key          | Default | Meaning                              |
-  | ------------ | ------- | ------------------------------------ |
-  | `uncap_fps`  | `false` | Lift the display-refresh frame cap (can stutter) |
-  | `fullscreen` | `false` | Start in fullscreen                  |
-  | `width`      | `1280`  | Window width                         |
-  | `height`     | `720`   | Window height                        |
-  | `extra_browser_args` | `""` | Extra Chromium switches for WebView2 |
-  | `resource_swapper` | `true` | Serve files from the `swap` folder |
-  | `check_for_updates` | `true` | Look for updates at launch |
-
-- `scripts\*.js` are injected into Krunker pages before the game's own
-  scripts, in file-name order. Changes apply on the next launch.
-
-- `swap\` replaces Krunker's assets with your own files. Mirror the URL
-  path: `swap\textures\weapons\weapon_2.png` replaces
-  `https://assets.krunker.io/textures/weapons/weapon_2.png` (and the same
-  path on any `krunker.io` subdomain, with or without an `/assets` prefix).
-  Query strings are ignored, so swaps survive game updates. Swap packs made
-  for Crankshaft work unchanged. The folder is scanned at launch, so restart
-  after adding or removing files; edits to an existing file apply on the
-  next load of that file.
-
-  Swapped responses are sent with `Cache-Control: no-store`, so a removed
-  swap never lingers in the browser cache.
+Logs are in `%LOCALAPPDATA%\dev.krust.client\logs`.
 
 ## Security
 
@@ -125,13 +111,8 @@ The game is remote content and gets no access to Tauri's IPC, so the page
 cannot call into the Rust side. The settings commands are declared in
 `build.rs`, which makes Tauri deny them by default, and
 `capabilities/settings.json` grants them only to the bundled settings
-window. The folder command takes a name (`swap`, `scripts`, `config`),
-never a path. Userscripts run with the page's privileges;
-only install ones you trust.
-
-The swapper only serves files found when the `swap` folder was scanned, so
-a crafted URL such as `/../../Windows/win.ini` cannot reach anything else on
-disk.
+window. See [SECURITY.md](SECURITY.md) for how releases are signed and
+how to report a vulnerability.
 
 ## Releasing
 
@@ -139,10 +120,10 @@ See [RELEASING.md](RELEASING.md).
 
 ## Credits
 
-Feature ideas come from [Crankshaft](https://github.com/KraXen72/crankshaft)
-(GPL-3.0) and the project layout follows
-[tauri-krunker](https://github.com/vaqqq/tauri-krunker) (MIT). No code from
-either is included.
+The project layout follows
+[tauri-krunker](https://github.com/vaqqq/tauri-krunker) (MIT), and some
+ideas came from [Crankshaft](https://github.com/KraXen72/crankshaft)
+(GPL-3.0). No code from either is included.
 
 ## License
 

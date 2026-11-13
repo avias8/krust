@@ -54,7 +54,5 @@ certutil -hashfile Krust_0.1.0_x64-setup.exe SHA256
 - The game page (krunker.io) is remote content with no access to Krust's
   native commands. Only the bundled settings window may call them; see
   `src-tauri/build.rs` and `src-tauri/capabilities/settings.json`.
-- The resource swapper only serves files found when it scanned the swap
-  folder, so request URLs cannot reach other files on disk.
-- Userscripts run with the game page's privileges. Only install scripts
-  you trust.
+- Krust does not inject scripts into the game page or alter the files it
+  loads.
