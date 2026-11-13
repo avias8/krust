@@ -29,7 +29,7 @@ SmartScreen may show "Windows protected your PC" the first time. Choose
 ## Features
 
 - Opens krunker.io in a native window
-- Optional uncapped frame rate (WebView2 browser arguments)
+- Optional uncapped frame rate (off by default; see Status)
 - Userscript loader
 - Resource swapper, compatible with Crankshaft-style swap folders
 - Settings window (<kbd>F1</kbd>) and keyboard shortcuts
@@ -44,8 +44,13 @@ Pre-release. Tested on Windows 11 with WebView2 157 and a 240 Hz display:
 
 - The installer is under 2 MB and installs per user, without admin rights.
   Uninstalling removes the app and its shortcuts and keeps your settings.
-- On a live game page: 240 FPS with `uncap_fps` off, and 900 to 1,200 FPS
-  with it on (short samples). Long-session stability is not yet tested.
+- Frame rate: capped (the default) follows the monitor, 240 FPS here, and is
+  smooth. Uncapped reaches 400 to 1,200 FPS, but frames reach the screen
+  unevenly, because modern WebView2 presents through the Windows compositor
+  and cannot tear like the old Chrome 85 clients. The result is visible
+  stutter, worst while aiming at large window sizes. Disabling
+  DirectComposition restores the old path but cut performance to about
+  30 FPS while scoped, so it is not used.
 - Updates: an installed build found, verified and installed a newer
   version, and refused a copy with one byte altered.
 
@@ -91,7 +96,7 @@ settings window (<kbd>F1</kbd>) edits them and opens these folders for you.
 
   | Key          | Default | Meaning                              |
   | ------------ | ------- | ------------------------------------ |
-  | `uncap_fps`  | `true`  | Lift the display-refresh frame cap   |
+  | `uncap_fps`  | `false` | Lift the display-refresh frame cap (can stutter) |
   | `fullscreen` | `false` | Start in fullscreen                  |
   | `width`      | `1280`  | Window width                         |
   | `height`     | `720`   | Window height                        |

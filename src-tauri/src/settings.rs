@@ -32,7 +32,10 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            uncap_fps: true,
+            // Capped by default: uncapped frames on modern WebView2 reach the
+            // screen unevenly (no tearing through the Windows compositor), which
+            // shows as stutter, worst while aiming in fullscreen.
+            uncap_fps: false,
             fullscreen: false,
             width: 1280.0,
             height: 720.0,
@@ -103,18 +106,18 @@ mod tests {
 
     #[test]
     fn uncapped_args_keep_the_wry_defaults() {
-        let args = Settings::default().browser_args();
+        let args = Settings {
+            uncap_fps: true,
+            ..Settings::default()
+        }
+        .browser_args();
         assert!(args.starts_with(DEFAULT_BROWSER_ARGS));
         assert!(args.contains("--disable-frame-rate-limit"));
     }
 
     #[test]
-    fn capped_args_are_only_the_defaults() {
-        let settings = Settings {
-            uncap_fps: false,
-            ..Settings::default()
-        };
-        assert_eq!(settings.browser_args(), DEFAULT_BROWSER_ARGS);
+    fn capped_by_default() {
+        assert_eq!(Settings::default().browser_args(), DEFAULT_BROWSER_ARGS);
     }
 
     #[test]
@@ -140,12 +143,12 @@ mod tests {
             fullscreen: true,
             ..base.clone()
         };
-        let capped = Settings {
-            uncap_fps: false,
+        let uncapped = Settings {
+            uncap_fps: true,
             ..base.clone()
         };
         assert!(!base.needs_restart_for(&fullscreen));
-        assert!(base.needs_restart_for(&capped));
+        assert!(base.needs_restart_for(&uncapped));
     }
 
     #[test]
