@@ -14,6 +14,10 @@
   },
   "bundle": {
     "active": true,
+    "publisher": "Krust contributors",
+    "copyright": "Copyright (c) 2026 Krust contributors. MIT License.",
+    "shortDescription": "Krunker.io client",
+    "longDescription": "An unofficial Krunker.io client built with Rust and Tauri, using the system WebView2 runtime.",
     "targets": ["nsis"],
     "icon": ["icons/icon.ico"]
   }

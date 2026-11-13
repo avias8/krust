@@ -8,9 +8,15 @@ Unofficial. Not affiliated with Krunker or FRVR.
 
 ## Status
 
-Early, but it builds and runs. Measured on Windows 11 with WebView2 157 and a
-240 Hz display, on a live Krunker game page: 240 FPS with `uncap_fps` off and
-about 920 FPS with it on. Long-session stability is not yet tested.
+Pre-release. Tested on Windows 11 with WebView2 157 and a 240 Hz display:
+
+- The installer is about 1 MB and installs per user, without admin rights.
+  Uninstalling removes the app and its shortcuts and keeps your settings.
+- On a live game page: 240 FPS with `uncap_fps` off, and 900 to 1,200 FPS
+  with it on (short samples). Long-session stability is not yet tested.
+
+The installer is not code-signed yet, so Windows SmartScreen may warn on
+first run.
 
 - Opens krunker.io in a native window
 - Optional uncapped frame rate (WebView2 browser arguments)
@@ -47,8 +53,9 @@ If the project lives under a long path, the MSVC linker can fail with
 `LNK1104`. Point Cargo at a short build directory first, for example
 `$env:CARGO_TARGET_DIR = "$env:LOCALAPPDATA\krust-target"`.
 
-Build an installer with `npm run build`. Run the unit tests with
-`cargo test` inside `src-tauri`.
+Build an installer with `npm run build`. It lands in
+`<target dir>\release\bundle\nsis\`. Run the unit tests with `cargo test`
+inside `src-tauri`.
 
 ## Settings, userscripts and swaps
 
